@@ -1,0 +1,41 @@
+from interactive import InteractiveDiffusion
+import argparse
+from datasets import load_dataset
+from alpaca_eval.main import evaluate as alpaca_farm_evaluate
+from tqdm import tqdm
+
+model_args = "flan_v2.xxl.length/args.json"
+model_ckpt = "flan_v2.xxl.length/checkpoint-20000"
+
+engine = InteractiveDiffusion(model_args, model_ckpt)
+tokenizer = engine.tokenizer
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--dataset", type=str, default="hamishivi/alpaca_eval_diffulm")
+args = parser.parse_args()
+
+ds = load_dataset(args.dataset, split="train")
+
+outputs = []
+for sample in tqdm(ds):
+    input_len = len(tokenizer.encode(sample["inputs"]))
+    # based on xlm, so 512 is max length
+    assert input_len < 512
+    answer = ""
+    for step in engine.sample(sample["inputs"], f"{512 - input_len} "):
+        answer = step
+    outputs.append({
+           "output": answer,
+           "generator": "flan_v2.xxl.length",
+           "instruction": sample["inputs"].replace("\nResponse: ", ""),
+    })
+
+df_leaderboard, annotations = alpaca_farm_evaluate(
+    model_outputs=outputs,
+    annotators_config="alpaca_eval_gpt4",
+    output_path=args.save_dir,
+    is_return_instead_of_print=True,
+    is_overwrite_leaderboard=True,
+)
+
+print(df_leaderboard.to_string(float_format="%.2f"))

@@ -55,6 +55,4 @@ class InteractiveDiffusion:
                 output = step_out.output_tokens[~partial_masks]
                 full_output = step_out.output_tokens.tolist()[0]
                 yield self.tokenizer.decode(output)
-            
-            yield("-------")
-    
+
